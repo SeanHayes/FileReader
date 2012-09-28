@@ -190,6 +190,8 @@
 		
 		// Custom properties
 		this._id = null;
+		
+		this._asText = false;
 	};
 	
 	window.FileReader.prototype = {
@@ -199,8 +201,14 @@
 			FileAPIProxy.swfObject.read(file.input, file.name, 'readAsBinaryString');
 		},
 		readAsText: function (file, encoding) {
-			this._start(file);
-			FileAPIProxy.swfObject.read(file.input, file.name, 'readAsText');
+			// NOTE: these next 2 lines throw an error, so we'll work around it
+			// using readAsDataURL
+			//this._start(file);
+			//FileAPIProxy.swfObject.read(file.input, file.name, 'readAsText');
+			
+			this._asText = true;
+			
+			this.readAsDataURL(file);
 		},
 		readAsDataURL: function (file) {
 			this._start(file);
@@ -234,6 +242,21 @@
 		},
 		
 		// Custom private methods
+		_convertDataURLToText: function(){
+			var result = this.result;
+			if (result.substr(0, 10) == 'data:text/'){
+				result = result.substr(result.indexOf(';')+1);
+				
+				if (result.substr(0, 7) == 'base64,'){
+					result = result.substr(7);
+					//lines over a certain length have whitespace added in by jquery.FileReader
+					result = result.replace(/\s+/g, '');
+					result = atob(result);
+				}
+				
+				this.result = result;
+			}
+		},
 		
 		// Registers FileReader instance for flash callbacks
 		_register: function(file) {
@@ -255,6 +278,9 @@
 				case 'load':
 					this.readyState = this.DONE;
 					this.result = FileAPIProxy.swfObject.result(this._id);
+					if (this._asText){
+						this._convertDataURLToText();
+					}
 					break;
 				case 'error':
 					this.result = null;
